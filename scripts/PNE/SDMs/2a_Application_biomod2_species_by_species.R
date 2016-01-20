@@ -41,7 +41,6 @@
 
 ## Script initialisation -------------------------------------------------------
 rm(list=ls())
-library(biomod2)
 
 ## Retireve input args ---------------------------------------------------------
 args <- commandArgs(trailingOnly=TRUE)
@@ -81,8 +80,11 @@ if(user == "maya"){
 } else if (user == "luke"){
   path_input <- "/nfs_scratch2/emabio/FATEHD/_SP_VERSION/_INPUT_DATA/"
   path_output <- "/nfs_scratch2/emabio/FATEHD/_SP_VERSION/_OUTPUT_DATA/"
+  .libPaths('/nfs_scratch2/emabio/R_PKG_LUKE') ## here are the shared library installed on luke
 } else stop("Unsupported 'user' value")
 
+## load needed packages --------------------------------------------------------
+library(biomod2)
 
 ## create the output directory
 path_sce <- paste(path_output,"DATA_",sce,"/",sep="")
