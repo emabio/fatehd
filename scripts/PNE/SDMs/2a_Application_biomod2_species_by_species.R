@@ -15,6 +15,12 @@
 ##'   were constructed using merged occurences of all the species that bellong it.
 ##' 
 ##' @log 
+##'   - 17/01/2016 (Damien)
+##'       - do projection with rasters instead of tables
+##'       - make it gridded friendly way
+##'       - add the possiblity to check if models/ensemble models/ensemble models 
+##'         projections have been produced not to start from scratch
+##'       - give the species name as input parameter (not the id of the species)
 ##' 
 ##' @licencing GPL
 ##'     Copyright (C) 2015  Damien G.
@@ -37,16 +43,30 @@
 rm(list=ls())
 library(biomod2)
 
-
-### CAREFUL !! IF USING GBM, parallelization sometimes goes wrong...
+## Retireve input args ---------------------------------------------------------
 args <- commandArgs(trailingOnly=TRUE)
-i = as.numeric(args[1])
+sp.name <- as.character(args[1]) ## give the name of the species
+# sp.name <- "X6"
+
 
 ## Constants definition --------------------------------------------------------
-sce = "AUST"
-user = "ftp"
-nrep = 5 # number of repetitions in Biomod
+user = "ftp" ## the id of user/machine which do the analyses
+sce = "AUST" ## the vlimatic environmental variable source ("NICK" or "AUST")
+nrep = 5 ## number of repetitions in Biomod
+env.var.names <- c("bio_3", "bio_4", "bio_7", "bio_11", "bio_12", "carbon", "slope") ## variables we are interested in
+nb.extr.abs.glacier <- 200 ## if > 0, the number of absences that will be added from glacier area
+check.computed <- TRUE ## check if models/ensemble models/ensemble models projections have been computed and load them directly if it is the case
 
+## Print brief summary of the script args --------------------------------------
+cat("\nBuild PFG determinant species SDM -------------------------------------")
+cat("\nstart at:", format(Sys.time(), "%a %d %b %Y %X"))
+cat("\n species:", sp.name)
+cat("\n user:", user)
+cat("\n nrep:", nrep)
+cat("\n env.var.names:", env.var.names)
+cat("\n nb.extr.abs.glacier:", nb.extr.abs.glacier)
+cat("check.computed:", check.computed)
+cat("\n-----------------------------------------------------------------------")
 
 ## Paths to data definition ----------------------------------------------------
 if(user == "maya"){
@@ -58,7 +78,10 @@ if(user == "maya"){
 } else if (user == "ftp"){
   path_input <- "/media/ftp-public/GUEGUEN_Maya/_SP_VERSION/_INPUT_DATA/"
   path_output <- "/media/ftp-public/GUEGUEN_Maya/_SP_VERSION/_OUTPUT_DATA/"
-}
+} else if (user == "luke"){
+  path_input <- "/nfs_scratch2/emabio/FATEHD/_SP_VERSION/_INPUT_DATA/"
+  path_output <- "/nfs_scratch2/emabio/FATEHD/_SP_VERSION/_OUTPUT_DATA/"
+} else stop("Unsupported 'user' value")
 
 
 ## create the output directory
@@ -68,72 +91,97 @@ setwd(path_sce)
 
 
 ## get the data we need --------------------------------------------------------
-sp = gtools::mixedsort(sub("ENV_","",list.files(paste(path_output,"DATA_",sce,"/PFT_env/",sep=""))))
-nbgr = length(sp)  # number of PFT
 load(paste(path_output,"PLOTS_Ecrins",sep=""))
 coord_XY <- input[,c("PlotID_KEY","X_ETRS89","Y_ETRS89")]
 
-if(sce=="NICK"){
-  load(paste(path_input,"ENV_ALL_ECRINS/CURRENT/ParcEcrinsSG_env.table",sep="")) # environment for projections
+if(sce == "NICK"){
+  ## releves environment for models creation
   data.env <- get(load(paste(path_output,"data.env.NICK",sep="")))
-} else {
-  load(paste(path_input,"ENV_ALL_ECRINS/EOBS_1970_2005/ParcEcrinsSG_env.table",sep="")) # environment for projections
+  ## full environment of PNE for projections
+  PNE.env.files <- file.path(path_input,"ENV_ALL_ECRINS", "CURRENT", paste0(env.var.names, ".img"))
+  PNE.env.stk <- raster::stack(PNE.env.files)
+} else if(sce == "AUST"){
+  ## releves environement for models creation
   data.env <- get(load(paste(path_output,"data.env.AUST",sep="")))
-}
-
-mask <- get(load(paste(path_output,"maskParcEcrinsSansGlacierNiLac.raster",sep="")))
-xy_proj <- xyFromCell(mask,which(!is.na(mask[])))
-
+  ## full environment of PNE for projections
+  PNE.env.files <- file.path(path_input,"ENV_ALL_ECRINS", "EOBS_1970_2005", paste0(env.var.names, ".img"))
+  PNE.env.stk <- raster::stack(PNE.env.files)
+} else stop("Unsupported 'sce' value")
 
 ###############################################################################################
 ### Implementation of the models in BIOMOD and projections onto Ecrins Park
 ###############################################################################################
 
-print(sp[i])
-load(paste(path_sce,"PFT_occ/OCC_",sp[i],sep="")) # responses vector
-load(paste(path_sce,"PFT_env/ENV_",sp[i],sep="")) # explanatory variables
+load(paste(path_sce,"PFT_occ/OCC_",sp.name,sep="")) # responses vector
+load(paste(path_sce,"PFT_env/ENV_",sp.name,sep="")) # explanatory variables
 
 ## Add Glacier absences
-site_gla <- coord_XY$PlotID_KEY[grep("GLACIER-",coord_XY$PlotID_KEY)]
-abs_add <- rep(0,200)
-names(abs_add) <- sample(site_gla,200)
-pft.occ <- c(pft.occ,abs_add)
-pft.env <- rbind(pft.env,data.env[which(rownames(data.env) %in% names(abs_add)),])
+if(nb.extr.abs.glacier > 0){
+  site_gla <- coord_XY$PlotID_KEY[grep("GLACIER-",coord_XY$PlotID_KEY)]
+  abs_add <- rep(0, nb.extr.abs.glacier)
+  names(abs_add) <- sample(site_gla, nb.extr.abs.glacier)
+  pft.occ <- c(pft.occ,abs_add)
+  pft.env <- rbind(pft.env,data.env[which(rownames(data.env) %in% names(abs_add)),])
+}
 
 xy <- coord_XY[which(names(pft.occ) %in% coord_XY$PlotID_KEY),c("X_ETRS89","Y_ETRS89")]
 
 ## formating data in a biomod2 friendly way ------------------------------------
 bm.form <- BIOMOD_FormatingData(resp.var=pft.occ, expl.var=pft.env[,c(1:7)], resp.xy=xy, 
-                                  resp.name=sp[i])
+                                  resp.name=sp.name)
 
 ## define models options -------------------------------------------------------
 bm.opt <- BIOMOD_ModelingOptions(GLM=list(type="polynomial",test="AIC"), GBM=list(n.trees=3000), GAM=list(k=4))
 
+
 ## run single models -----------------------------------------------------------
-bm.mod <- BIOMOD_Modeling(data=bm.form, models=c('RF', 'MARS', 'GLM', 'GAM', 'GBM'), models.options=bm.opt,
-                        NbRunEval=nrep, DataSplit=70, 
-                        Prevalence = 0.5,
-                        VarImport=0, models.eval.meth=c('TSS','ROC'), do.full.models = TRUE, modeling.id = 'mod1')
+
+if(check.computed){
+  bm.mod.file <- list.files(paste0(path_output,"DATA_",sce,"/", sp.name), pattern = "mod1.models.out$", full.names = TRUE)
+  bm.em.file <- list.files(paste0(path_output,"DATA_",sce,"/", sp.name), pattern = "ensemble.models.out$", full.names = TRUE)
+  bm.ef.file <- list.files(paste0(path_output,"DATA_",sce,"/", sp.name, "/ParcEcrins_current"), pattern = "ensemble.projection.out$", full.names = TRUE)
+} 
+
+if(check.computed & length(bm.mod.file)){
+  bm.mod <- get(load(bm.mod.file))
+} else {
+  bm.mod <- BIOMOD_Modeling(data = bm.form, 
+                            models = c('RF', 'MARS', 'GLM', 'GAM', 'GBM'), 
+                            models.options = bm.opt,
+                            NbRunEval = nrep, DataSplit = 70,
+                            Prevalence = 0.5, VarImport=0, 
+                            models.eval.meth = c('TSS','ROC'), 
+                            do.full.models = TRUE, modeling.id = 'mod1')
+}
 
 ## run ensemble models ---------------------------------------------------------
-bm.em <- BIOMOD_EnsembleModeling(modeling.output = bm.mod, 
-                                 chosen.models = "all",
-                                 em.by = "all",
-                                 eval.metric = c('TSS'),
-                                 eval.metric.quality.threshold = 0.4, 
-                                 models.eval.meth = c('TSS', 'ROC'),
-                                 prob.mean = FALSE,
-                                 prob.mean.weight = TRUE, 
-                                 prob.mean.weight.decay = 'proportional',
-                                 committee.averaging = TRUE)
+if(check.computed & length(bm.em.file)){
+  bm.em <- get(load(bm.em.file))
+} else {
+  bm.em <- BIOMOD_EnsembleModeling(modeling.output = bm.mod, 
+                                   chosen.models = "all",
+                                   em.by = "all",
+                                   eval.metric = c('TSS'),
+                                   eval.metric.quality.threshold = 0.4, 
+                                   models.eval.meth = c('TSS', 'ROC'),
+                                   prob.mean = FALSE,
+                                   prob.mean.weight = TRUE, 
+                                   prob.mean.weight.decay = 'proportional',
+                                   committee.averaging = TRUE)
+}
 
 ## project ensemble models -----------------------------------------------------
-bm.ef <- BIOMOD_EnsembleForecasting(EM.output = bm.em, 
-                                    new.env = as.data.frame(ParcEcrinsSG_env[,1:7]), 
-                                    proj.name = "ParcEcrins_current",
-                                    xy.new.env = xy_proj, 
-                                    selected.models="all", 
-                                    binary.meth=c('TSS'))
+if(check.computed & length(bm.ef.file)){
+  bm.ef <- get(load(bm.ef.file))
+} else{
+  bm.ef <- BIOMOD_EnsembleForecasting(EM.output = bm.em, 
+                                      new.env = PNE.env.stk, 
+                                      output.format = ".img",
+                                      proj.name = "ParcEcrins_current",
+                                      xy.new.env = xy_proj, 
+                                      selected.models="all", 
+                                      binary.meth=c('TSS'))
+}
 
 ## end of script ---------------------------------------------------------------
 
