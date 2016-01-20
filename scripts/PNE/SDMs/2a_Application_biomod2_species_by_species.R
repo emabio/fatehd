@@ -11,8 +11,11 @@
 ##'   averaging. PFGDMs will then be constructed taking the max probs accros
 ##'   species of the PFG. 
 ##'   
-##' @note Here the philosophy is quite different from Isa's Paper where the PFGDMs
-##'   were constructed using merged occurences of all the species that bellong it.
+##' @note 
+##'   - Here the philosophy is quite different from Isa's Paper where the PFGDMs
+##'     were constructed using merged occurences of all the species that bellong it.
+##'   - A peace of code to generate parameters file to run script on luke is avalable
+##'     at the end of the script.
 ##' 
 ##' @log 
 ##'   - 17/01/2016 (Damien)
@@ -145,6 +148,7 @@ if(check.computed){
 } 
 
 if(check.computed & length(bm.mod.file)){
+  cat("\n loading previous version of bm.mod..")
   bm.mod <- get(load(bm.mod.file))
 } else {
   bm.mod <- BIOMOD_Modeling(data = bm.form, 
@@ -158,6 +162,7 @@ if(check.computed & length(bm.mod.file)){
 
 ## run ensemble models ---------------------------------------------------------
 if(check.computed & length(bm.em.file)){
+  cat("\n loading previous version of bm.em..")
   bm.em <- get(load(bm.em.file))
 } else {
   bm.em <- BIOMOD_EnsembleModeling(modeling.output = bm.mod, 
@@ -174,6 +179,7 @@ if(check.computed & length(bm.em.file)){
 
 ## project ensemble models -----------------------------------------------------
 if(check.computed & length(bm.ef.file)){
+  cat("\n loading previous version of bm.ef..")
   bm.ef <- get(load(bm.ef.file))
 } else{
   bm.ef <- BIOMOD_EnsembleForecasting(EM.output = bm.em, 
@@ -185,6 +191,12 @@ if(check.computed & length(bm.ef.file)){
                                       binary.meth=c('TSS'))
 }
 
+cat("\n\nCompleted!")
+cat("\nended at:", format(Sys.time(), "%a %d %b %Y %X"))
+
 ## end of script ---------------------------------------------------------------
 
-
+# ## generate params for grid computing ------------------------------------------
+# sp.all <- gtools::mixedsort(list.files("/media/ftp-public/GUEGUEN_Maya/_SP_VERSION/_OUTPUT_DATA/DATA_AUST/", "^X"))
+# cat(sp.all, sep = "\n", file = "~/Work/FATEHD/fatehdhub/scripts/PNE/SDMs/2a_Application_biomod2_species_by_species.params")
+# ## end generate params for grid computing --------------------------------------

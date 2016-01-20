@@ -1,0 +1,26 @@
+#!/bin/bash
+
+## OAR instructions ##
+#OAR -n fatehd_sdm
+#OAR --project teembio
+#OAR -l core=1,walltime=10:00:00
+#OAR -O log_fatehd_sdm.%jobid%.stdout
+#OAR -E log_fatehd_sdm.%jobid%.stderr
+
+## define some bash options
+set -e ## exit the script as soon as a function return an error
+
+source /applis/ciment/v2/env.bash 
+module load netcdf
+module load proj
+module load gdal
+module load R
+
+## run our R script
+R CMD BATCH "--args ${1}" /nfs_scratch2/emabio/FATEHD/fatehdhub/scripts/PNE/SDMs/2a_Application_biomod2_species_by_species.R /dev/stdout
+
+## quit the script
+exit $?
+
+## LAUNCH INSTRUCTIONS ##
+## oarsub -S /nfs_scratch2/emabio/FATEHD/fatehdhub/scripts/PNE/SDMs/2a_Application_biomod2_species_by_species.oar --array-param-file /nfs_scratch2/emabio/FATEHD/fatehdhub/scripts/PNE/SDMs/2a_Application_biomod2_species_by_species.params
