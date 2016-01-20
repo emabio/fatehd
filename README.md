@@ -1,2 +1,2 @@
 # fatehd
-here are stored fatehd related scripts
+Here are stored fatehd related scripts
