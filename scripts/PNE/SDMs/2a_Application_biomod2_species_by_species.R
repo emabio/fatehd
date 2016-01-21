@@ -48,11 +48,11 @@ rm(list=ls())
 ## Retireve input args ---------------------------------------------------------
 args <- commandArgs(trailingOnly=TRUE)
 sp.name <- as.character(args[1]) ## give the name of the species
-# sp.name <- "X6"
+# sp.name <- "X10352"
 
 
 ## Constants definition --------------------------------------------------------
-user = "ftp" ## the id of user/machine which do the analyses
+user = "luke" ## the id of user/machine which do the analyses
 sce = "AUST" ## the vlimatic environmental variable source ("NICK" or "AUST")
 nrep = 5 ## number of repetitions in Biomod
 env.var.names <- c("bio_3", "bio_4", "bio_7", "bio_11", "bio_12", "carbon", "slope") ## variables we are interested in
