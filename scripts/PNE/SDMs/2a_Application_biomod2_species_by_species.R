@@ -209,9 +209,9 @@ cat("\nended at:", format(Sys.time(), "%a %d %b %Y %X"))
 # sp.all <- as.character(read.table(param.file, stringsAsFactors = FALSE)[, 1])
 # 
 # ## check if models/ensemble models/ensemble models projections have been produced
-# sp.mod.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, paste0(sp, ".mod1.models.out")))})
-# sp.em.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, paste0(sp, ".mod1ensemble.models.out")))})
-# sp.ef.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, "proj_ParcEcrins_current", paste0(sp, ".ParcEcrins_current.ensemble.projection.out")))})
+# sp.mod.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, paste0(sp_, ".mod1.models.out")))})
+# sp.em.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, paste0(sp_, ".mod1ensemble.models.out")))})
+# sp.ef.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, "proj_ParcEcrins_current", paste0(sp_, ".ParcEcrins_current.ensemble.projection.out")))})
 # 
 # ## print the campain status summary
 # cat("\ncampain stats:",
