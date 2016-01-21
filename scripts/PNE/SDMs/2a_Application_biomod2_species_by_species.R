@@ -199,3 +199,23 @@ cat("\nended at:", format(Sys.time(), "%a %d %b %Y %X"))
 # sp.all <- gtools::mixedsort(list.files("/media/ftp-public/GUEGUEN_Maya/_SP_VERSION/_OUTPUT_DATA/DATA_AUST/", "^X"))
 # cat(sp.all, sep = "\n", file = "~/Work/FATEHD/fatehdhub/scripts/PNE/SDMs/2a_Application_biomod2_species_by_species.params")
 # ## end generate params for grid computing --------------------------------------
+
+# ## check campaain status -------------------------------------------------------
+# ## define path to param and output files
+# param.file <- "/nfs_scratch2/emabio/FATEHD/fatehdhub/scripts/PNE/SDMs/2a_Application_biomod2_species_by_species.params"
+# output.file <- "/nfs_scratch2/emabio/FATEHD/_SP_VERSION/_OUTPUT_DATA/DATA_AUST"
+# 
+# ## get the names of species we want to model
+# sp.all <- as.character(read.table(param.file, stringsAsFactors = FALSE)[, 1])
+# 
+# ## check if models/ensemble models/ensemble models projections have been produced
+# sp.mod.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, paste0(sp, ".mod1.models.out")))})
+# sp.em.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, paste0(sp, ".mod1ensemble.models.out")))})
+# sp.ef.test <- sapply(sp.all, function(sp_){file.exists(file.path(output.file, sp_, "proj_ParcEcrins_current", paste0(sp, ".ParcEcrins_current.ensemble.projection.out")))})
+# 
+# ## print the campain status summary
+# cat("\ncampain stats:",
+#     "\n\tsingle models:", sum(sp.mod.test), "/", length(sp.mod.test),
+#     "\n\tensemble models:", sum(sp.em.test), "/", length(sp.em.test),
+#     "\n\tensemble models projection:", sum(sp.ef.test), "/", length(sp.ef.test))
+# ## end check campaain status ---------------------------------------------------
