@@ -186,7 +186,6 @@ if(check.computed & length(bm.ef.file)){
                                       new.env = PNE.env.stk, 
                                       output.format = ".img",
                                       proj.name = "ParcEcrins_current",
-                                      xy.new.env = xy_proj, 
                                       selected.models="all", 
                                       binary.meth=c('TSS'))
 }
