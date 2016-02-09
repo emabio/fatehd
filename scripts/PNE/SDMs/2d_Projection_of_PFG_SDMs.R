@@ -40,7 +40,7 @@ sp.name <- as.character(args[1]) ## give the name of the species
 
 
 ## Constants definition --------------------------------------------------------
-user = "ftp" ## the id of user/machine which do the analyses
+user = "luke" ## the id of user/machine which do the analyses
 sce = "AUST" ## the vlimatic environmental variable source ("NICK" or "AUST")
 version.name = "_PFG_VERSION" ## the type of model unit ("_SP_VERSION" or "_PFG_VERSION")
 env.var.names <- c("bio_6", "bio_9", "bio_12", "bio_15", "carbon", "slope") ## variables we are interested in
@@ -75,6 +75,14 @@ cat("\n loading previous version of bm.em..")
 bm.em.file <- list.files(paste0(path_input,"DATA_",sce,"/", sp.name), pattern = "ensemble.models.out$", full.names = TRUE)
 bm.em <- get(load(bm.em.file))
 
-## 
+## do ensemble forecasting
+bm.ef <- BIOMOD_EnsembleForecasting(EM.output = bm.em, 
+                                    new.env = PNE.env.stk, 
+                                    output.format = ".img",
+                                    proj.name = "ParcEcrins_current",
+                                    selected.models="all", 
+                                    binary.meth=c('TSS'))
+
+
 
 
