@@ -42,30 +42,25 @@ library(raster)
 library(rasterVis)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 library(gridExtra)
 
 ## evaluate PFG models
 dat.path <- "/nfs_scratch2/emabio/FATEHD/_PFG_VERSION/_OUTPUT_DATA_NEW_ENV/DATA_AUST/PFT_occ"
-mod.path.pfg <- "/nfs_scratch2/emabio/FATEHD/_PFG_VERSION/_OUTPUT_DATA_NEW_ENV/DATA_AUST"
-mod.path.sp <- "/nfs_scratch2/emabio/FATEHD/_SP_VERSION/_OUTPUT_DATA_NEW_ENV/DATA_AUST"
+# mod.path.pfg <- "/nfs_scratch2/emabio/FATEHD/_PFG_VERSION/_OUTPUT_DATA_NEW_ENV/DATA_AUST"
+mod.path.pfg <- "/nfs_scratch2/emabio/FATEHD/_PFG_VERSION/_OUTPUT_DATA_NEW_ENV/DATA_AUST_VAR_ISA_ALPS/"
 mod.path.isa <- "/nfs_scratch2/emabio/FATEHD/_ISA_VERSION"
 
 pfg.list <- list.files(mod.path.pfg, "[C,H,P][0-9]{1,2}")
 
-# pfg_ <- pfg.list[24]
-for(pfg_ in pfg.list[7:24]){
+# pfg_ <- "H5"
+for(pfg_ in pfg.list){
   cat("\n\n>", pfg_)
   
   cat("\n\tloading pfg based models")
   ## the SDM based on PFG occurence
   pfg.mod.pred.ras <- raster(list.files(file.path(mod.path.pfg, pfg_, "proj_ParcEcrins_current", "individual_projections"), "_EMwmeanByTSS_mergedAlgo_mergedRun_mergedData.img$", full.names = TRUE))
-  
-  cat("\n\tloading species based models")
-  ## the SDM based on individual species occurence
-  pfg.mod.pred.ras.q70 <- raster(list.files(file.path(mod.path.sp, pfg_, "ParcEcrins_current", "EMwmeanByTSS"), "_q70_SDM.img$", full.names = TRUE))
-  pfg.mod.pred.ras.q80 <- raster(list.files(file.path(mod.path.sp, pfg_, "ParcEcrins_current", "EMwmeanByTSS"), "_q80_SDM.img$", full.names = TRUE))
-  pfg.mod.pred.ras.q90 <- raster(list.files(file.path(mod.path.sp, pfg_, "ParcEcrins_current", "EMwmeanByTSS"), "_q90_SDM.img$", full.names = TRUE))
-  
+    
   cat("\n\tloading isa's models")
   ## the formal SDM
   pfg.mod.pred.formal <- raster(list.files(mod.path.isa, paste0("_", pfg_, "_"), full.names = TRUE))
@@ -73,11 +68,11 @@ for(pfg_ in pfg.list[7:24]){
   pfg.mod.pred.formal <- projectRaster(pfg.mod.pred.formal, pfg.mod.pred.ras)
   
   ## create the stack of predictions
-  pred.stk <- stack(pfg.mod.pred.formal * 1000, pfg.mod.pred.ras, pfg.mod.pred.ras.q70, pfg.mod.pred.ras.q80, pfg.mod.pred.ras.q90)
-  names(pred.stk) <- c("isa", "pfg based", "q70 sp", "q80 sp", "q90 sp")
+  pred.stk <- stack(pfg.mod.pred.formal, pfg.mod.pred.ras / 1000)
+  names(pred.stk) <- c("isa sdm", "new sdm")
   
   cat("\n\tcreate level plot")
-  lp <- levelplot(pred.stk, layout = c(5,1), main = pfg_, colorkey = list(space = "bottom")) 
+  lp <- levelplot(pred.stk, layout = c(2,1), main = pfg_, colorkey = list(space = "bottom")) 
   
   pfg.dat <- get(load(list.files(dat.path, paste0("OCC_", pfg_, "$"), full.names = TRUE)))
   
@@ -91,7 +86,7 @@ for(pfg_ in pfg.list[7:24]){
   cat("\n\tevaluating models")
   eval.test.df <- NULL
   for(mod.name in colnames(pfg.mod.pred.df)){
-    eval.test.list <- lapply(seq(0, 1000, 10), function(x){
+    eval.test.list <- lapply(seq(0, 1, 0.02), function(x){
       biomod2::Find.Optim.Stat(Stat='TSS',
                                pfg.mod.pred.df[to.keep, mod.name],
                                pfg.dat[to.keep],
@@ -102,7 +97,7 @@ for(pfg_ in pfg.list[7:24]){
   
   
   ## scale variables
-  eval.test.df$cutoff <- eval.test.df$cutoff / 1000
+  eval.test.df$cutoff <- eval.test.df$cutoff
   eval.test.df$sensitivity <- eval.test.df$sensitivity / 100
   eval.test.df$specificity <- eval.test.df$specificity / 100
   
@@ -119,3 +114,18 @@ for(pfg_ in pfg.list[7:24]){
   print(grid.arrange(lp, gg, ncol = 1))
   dev.off()
 }
+
+
+
+####
+plot(pfg.mod.pred.formal)
+points(coord_XY[intersect(coord_XY$PlotID_KEY, names(pfg.dat)[pfg.dat == 1]), c("X_ETRS89","Y_ETRS89")], col = "red", pch = 1)
+points(coord_XY[intersect(coord_XY$PlotID_KEY, names(pfg.dat)[pfg.dat == 0]), c("X_ETRS89","Y_ETRS89")], col = "blue", pch = 1)
+
+
+plot(pfg.mod.pred.ras)
+points(coord_XY[intersect(coord_XY$PlotID_KEY, names(pfg.dat)[pfg.dat == 1]), c("X_ETRS89","Y_ETRS89")], col = "red", pch = 1)
+points(coord_XY[intersect(coord_XY$PlotID_KEY, names(pfg.dat)[pfg.dat == 0]), c("X_ETRS89","Y_ETRS89")], col = "blue", pch = 1)
+
+
+points(coord_XY[intersect(coord_XY$PlotID_KEY, names(pfg.dat)[pfg.dat == 0]), c("X_ETRS89","Y_ETRS89")], col = "black", pch = 1)

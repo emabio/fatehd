@@ -151,7 +151,9 @@ path_input_bio <- "/media/gueguen/equipes/emabio/GIS_DATA/Alpes/PHYSIQUE/CLIMATE
 path_input_spr_win <- "/home/gueguen/Documents/_DATA/DATA_FATE_Ecrins/RASTERS_clim/Spring_winter_temp/_AUTR_Scenario_EOBS_rcp26_45_85/"
 
 # slope, twi smoothed, bare rock, spring & winter temperature (LCC projection)
-for(var in c("bio_3","bio_4","bio_7","bio_11","bio_12")){
+# for(var in c("bio_3","bio_4","bio_7","bio_11","bio_12")){
+varEnv <- c("bio_6", "bio_9", "bio_12", "bio_15", "carbon", "slope")
+for(var in grep("bio_", varEnv, value = TRUE)){ 
   eval(parse(text=paste("RAS",var," <- raster(paste(path_input_bio,var,'.asc',sep=''))",sep="")))
   eval(parse(text=paste("projection(RAS",var,") <- projETRS89",sep="")))
 }

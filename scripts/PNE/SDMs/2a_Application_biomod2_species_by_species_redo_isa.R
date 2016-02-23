@@ -58,11 +58,11 @@ sp.name <- as.character(args[1]) ## give the name of the species
 
 ## Constants definition --------------------------------------------------------
 user = "luke" ## the id of user/machine which do the analyses
-sce = "AUST_VAR_ISA_ALPS" ## the vlimatic environmental variable source ("NICK" or "AUST")
+sce = "NICK_VAR_ISA_ALPS" ## the vlimatic environmental variable source ("NICK" or "AUST")
 version.name = "_PFG_VERSION" ## the type of model unit ("_SP_VERSION" or "_PFG_VERSION")
 nrep = 2 ## number of repetitions in Biomod
-env.var.names <- c("bio_6", "bio_9", "bio_12", "bio_15", "carbon", "slope") ## new variables we are interested in
-# env.var.names <- c("bio_3", "bio_4", "bio_7", "bio_11", "bio_12", "carbon", "slope") ## isa's variables
+# env.var.names <- c("bio_6", "bio_9", "bio_12", "bio_15", "carbon", "slope") ## new variables we are interested in
+env.var.names <- c("bio_3", "bio_4", "bio_7", "bio_11", "bio_12", "carbon", "slope") ## isa's variables
 nb.extr.abs.glacier <- 200 ## if > 0, the number of absences that will be added from glacier area
 check.computed <- FALSE ## check if models/ensemble models/ensemble models projections have been computed and load them directly if it is the case
 
@@ -101,14 +101,17 @@ setwd(path_sce)
 load(paste(path_output,"PLOTS_Ecrins",sep=""))
 coord_XY <- input[,c("PlotID_KEY","X_ETRS89","Y_ETRS89")]
 
-# if(sce == "AUST"){
-  ## full environment of ALPS for calibration
-  ALPS.env.files <- file.path(path_input,"ENV_ALL_ALPS", "EOBS_1970_2005", paste0(env.var.names, ".img"))
-  ALPS.env.stk <- raster::stack(ALPS.env.files)
-  ## full environment of PNE for projections
-  PNE.env.files <- file.path(path_input,"ENV_ALL_ECRINS", "EOBS_1970_2005", paste0(env.var.names, ".img"))
-  PNE.env.stk <- raster::stack(PNE.env.files)
-# } else stop("Unsupported 'sce' value")
+## load calibration environment
+(load("/nfs_scratch2/emabio/FATEHD/_ISA_VERSION/bioclimatic_data"))
+
+## to get slope
+slope <- raster("/nfs_scratch2/emabio/FATEHD/ENV_ALL_ALPS/EOBS_1970_2005/slope.img")
+input$slope <- extract(slope, coord_XY[input$PlotID_KEY , c("X_ETRS89","Y_ETRS89")])
+rownames(input) <- input$PlotID_KEY
+
+## load projection environment
+(load("/nfs_scratch2/emabio/FATEHD/_ISA_VERSION/ENV_ALL_ECRINS/CURRENT/ParcEcrinsSG_env.table"))
+
 
 ###############################################################################################
 ### Implementation of the models in BIOMOD and projections onto Ecrins Park
@@ -126,7 +129,8 @@ load(paste("/nfs_scratch2/emabio/FATEHD/PFT_OCC_FR_Alps/OCC_",sp.name,sep=""))
 #   pft.occ <- c(pft.occ,abs_add)
 # }
 
-xy <- coord_XY[names(pft.occ), c("X_ETRS89","Y_ETRS89")]
+
+xy <- input[names(pft.occ), c("X_ALBERS",  "Y_ALBERS")]
 
 # # Weight vector initialization to balance presences/absences
 # poids <- c()
@@ -136,7 +140,7 @@ xy <- coord_XY[names(pft.occ), c("X_ETRS89","Y_ETRS89")]
 
 ## formating data in a biomod2 friendly way ------------------------------------
 bm.form <- BIOMOD_FormatingData(resp.var = pft.occ, 
-                                expl.var = ALPS.env.stk, 
+                                expl.var = input[names(pft.occ), sub("_", "", env.var.names)], 
                                 resp.xy = xy, 
                                 resp.name = sp.name)
 
@@ -192,8 +196,7 @@ if(check.computed & length(bm.ef.file)){
   bm.ef <- get(load(bm.ef.file))
 } else{
   bm.ef <- BIOMOD_EnsembleForecasting(EM.output = bm.em, 
-                                      new.env = PNE.env.stk, 
-                                      output.format = ".img",
+                                      new.env = ParcEcrinsSG_env,
                                       proj.name = "ParcEcrins_current",
                                       selected.models="all", 
                                       binary.meth=c('TSS'))
