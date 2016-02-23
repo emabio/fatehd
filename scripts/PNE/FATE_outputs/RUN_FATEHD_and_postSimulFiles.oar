@@ -3,7 +3,7 @@
 ## OAR instructions ##
 #OAR -n fatehd_postSimul
 #OAR --project teembio
-#OAR -l cpu=1,walltime=48:00:00
+#OAR -l cpu=1/core=2,walltime=01:00:00
 #OAR -O log_fatehd_postSimul.%jobid%.stdout
 #OAR -E log_fatehd_postSimul.%jobid%.stderr
 
@@ -11,7 +11,8 @@
 set -e ## exit the script as soon as a function return an error
 
 ## work in scratch directory
-cd /nfs_scratch/mayagueguen/FATE_newHS
+## cd /nfs_scratch/mayagueguen/FATE_newHS
+cd /nfs_scratch2/dgeorges/FATE_newHS_devel
 
 ## some test of file existence
 echo ${2}
@@ -27,6 +28,8 @@ module load gnu-devel/4.6.2
 module load boost/1.53.0_gcc-4.7.2 
 module load proj
 module load gdal
+module load libpng
+module load cairo
 module load R
 
 
@@ -35,16 +38,37 @@ NB_CORES=$(cat $OAR_NODE_FILE | wc -l)
 echo 'FATEHDD will run over ' ${NB_CORES} ' cores'
 
 ## run FATEHD
+echo '--- run FATEHD -----------------------------------------------------------'
+echo `date`
 ./FATEHDD_5.9-5 ${2}
 
 ## run SIMULATION POST TREATMENT
-R CMD BATCH "--args ${1} ${2} ${3} ${4}" 1_CREATE_outputsTable.R /dev/stdout
+# R CMD BATCH "--args ${1} ${2} ${3} ${4}" 1_CREATE_outputsTable.R /dev/stdout
+echo '--- run VALIDATION PLOT MAPS ---------------------------------------------'
+echo `date`
+Rscript  1_CREATE_outputsTable.R ${1} ${2} ${3} ${4} >> /dev/stdout
+
 
 ## run VALIDATION PLOT MAPS
-R CMD BATCH "--args ${1} ${2}" 2_CREATE_PFGmaps_SDMvsFATE.R /dev/stdout
+# R CMD BATCH "--args ${1} ${2}" 2_CREATE_PFGmaps_SDMvsFATE.R /dev/stdout
+echo '--- run VALIDATION PLOT MAPS ---------------------------------------------'
+echo `date`
+Rscript  2_CREATE_PFGmaps_SDMvsFATE.R ${1} ${2} >> /dev/stdout
+
 
 ## run VALIDATION PFG AUC
-R CMD BATCH "--args ${1} ${2}" 3_VALIDATION_PFGrelevesAUC.R /dev/stdout
+# R CMD BATCH "--args ${1} ${2}" 3_VALIDATION_PFGrelevesAUC.R /dev/stdout
+echo '--- run VALIDATION PFG AUC -----------------------------------------------'
+echo `date`
+Rscript  3_VALIDATION_PFGrelevesAUC.R ${1} ${2} >> /dev/stdout
+
+
+
+## run VALIDATION PFG SENS/SPE/TSS
+# R CMD BATCH "--args ${1} ${2}" 4_SDM_FATEHD_comparaison_bis.R /dev/stdout
+echo '--- run VALIDATION PFG SENS/SPE/TSS --------------------------------------'
+echo `date`
+Rscript  4_SDM_FATEHD_comparaison_bis.R ${1} ${2} >> /dev/stdout
 
 
 ## quit the script
