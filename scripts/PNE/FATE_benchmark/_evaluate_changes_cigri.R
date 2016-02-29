@@ -1,22 +1,19 @@
 ### compute the graph of sens, spe change in function of time
-
-# .libPaths("/nfs_scratch2/emabio/R_PKG_LUKE/")
-
-
 rm(list = ls())
-
-sim.dir <- "/nfs_scratch2/dgeorges/FATE_newHS_devel/"
-setwd(file.path(sim.dir, "workdir"))
 
 ## Retrieve input args ---------------------------------------------------------
 args <- commandArgs(trailingOnly=TRUE)
-simul_name = as.character(args[1]) ## give the simulation name
-file_name = as.character(args[2]) ## give the paramSimul file name
+path.to.dat <- as.character(args[1])
+file_name <- as.character(args[2]) ## give the paramSimul file name
+file_name_ref = as.character(args[3])
+nbCores <- as.numeric(args[4]) ## give the number of resources to create outputs tables
+maps <- as.logical(args[5]) ## do you want to print pdf maps ?
+lib.dir <- as.character(args[6])
 
-# ## test
-# simul_name = "SIMUL_6STRATA" ## give the simulation name
-# file_name =  "SIMUL_6STRATA/PARAM_SIMUL/paramSimul_1.txt" ## give the paramSimul file name
-
+## Load libraries --------------------------------------------------------------
+if(length(lib.dir)){
+  .libPaths(lib.dir)
+}
 
 library(gridExtra)
 library(raster)
@@ -25,12 +22,41 @@ library(tidyr)
 library(ggplot2)
 library(rasterVis)
 
-simul_id <- sub(".*paramSimul_", "", sub(".txt$", "", file_name))
 
-path.input.data <- "/nfs_scratch2/dgeorges/FATE_newHS_devel/data"
+# path.to.dat <- "/home/dgeorges/fhdmpt" 
+# file_name <- "/home/dgeorges/fhdmpt/SIMUL_6STRATA_TEST/PARAM_SIMUL/ParamsSimul_1.txt"
+# file_name_ref <- "/home/dgeorges/fhdmpt/SIMUL_6STRATA_REF/PARAM_SIMUL/ParamsSimul_ref1.txt"
+# nbCores <- 1 
+# maps <- FALSE 
+# lib.dir <- "/home/dgeorges/R_PKG_LUKE"
+
+## print simul parameters ------------------------------------------------------
+cat("\nInput parameters --------")
+cat("\n- path.to.dat <-", path.to.dat)
+cat("\n- file_name <-", file_name)
+cat("\n- file_name_ref <-", file_name_ref)
+cat("\n- nbCores <-", nbCores)
+cat("\n- maps <-", maps)
+cat("\n- lib.dir <-", lib.dir)
+cat("\n-------------------------")
+
+## Retrieve name of the simul replication --------------------------------------
+cat("\n PARAM SIMUL FILE : ",file_name)
+
+## get the simul results directory name
+source(file.path(path.to.dat, "Functions", "_get_parameters_utils.R"))
+
+simul.param.list <- readLines(file_name, warn = FALSE)
+simul.res.dir <- get.char.param(pl = simul.param.list, flag = "--SAVE_DIR--")
+global.param.file <- get.char.param(pl = simul.param.list, flag = "--GLOBAL_PARAMS--")
+
+## define the id of the simul as the saving directory name
+simul_id = basename(simul.res.dir)
+
+path.input.data <- file.path(path.to.dat, "Data")
 pattern.input.data <- ".aust.newSetOfVar.austExt.RData"
 
-path.output <- "/nfs_scratch2/dgeorges/FATE_newHS_devel/SIMUL_6STRATA/simul_comparaisons"
+path.output <- file.path("simul_comparaisons", simul_id)
 path.output.tab <- file.path(path.output, "table")
 path.output.graph <- file.path(path.output, "graph")
 dir.create(path.output.tab, showWarnings = FALSE, recursive = TRUE)
@@ -42,17 +68,22 @@ projLCC <- "+proj=lcc +lat_1=45.89891888888889 +lat_2=47.69601444444444 +lat_0=4
 
 abund.thresh <- 0 ## abundance use to convert FATEHD abundances into PA
 
-ref.simul <- "/nfs_scratch2/dgeorges/FATE_newHS_devel/SIMUL_6STRATA/outputsTables"
-ref.rep <- "rep4"
-ref.mask.path <- "/nfs_scratch2/dgeorges/FATE_newHS_devel/SIMUL_6STRATA/DATA/MASK/maskEcrins.asc"
-ref.array.PFG.files <- list.files(ref.simul, paste0("arrayPFG.*", ref.rep), full.names = TRUE)
+ref.simul.dir <- dirname(dirname(file_name_ref))
+
+ref.simul.file <- file(file_name_ref, "r")
+ref.simul.file.pl <- readLines(ref.simul.file, warn = FALSE)
+ref.rep <- basename(get.char.param(ref.simul.file.pl, "--SAVE_DIR--"))
+
+
+ref.mask.path <- get.char.param(simul.param.list, "--MASK--")
+
+ref.array.PFG.files <- list.files(file.path(ref.simul.dir, "outputsTables"), paste0("arrayPFG.*_rep", ref.rep), full.names = TRUE)
 ref.times <- sort(as.numeric(sub("^.*_year", "", sub("_rep.*$", "", ref.array.PFG.files))))
 
 
-test.simul <- "/nfs_scratch2/dgeorges/FATE_newHS_devel/SIMUL_6STRATA/outputsTables"
-test.rep <- paste0("rep", simul_id)
-test.array.PFG.files <- list.files(test.simul, paste0("arrayPFG.*", test.rep), full.names = TRUE)
-test.times <- sort(as.numeric(sub("^.*_year", "", sub("_rep.*$", "", test.array.PFG.files))))
+test.simul <- file.path("outputsTables", simul_id)
+test.array.PFG.files <- list.files(test.simul, paste0("arrayPFG"), full.names = TRUE)
+test.times <- sort(as.numeric(sub("^.*_year", "", test.array.PFG.files)))
 
 inter.times <- intersect(ref.times, test.times)
 
@@ -70,7 +101,7 @@ cat("\n> loading array PFG:")
 for(yr_ in dimnames(ref.array.PFG)[[3]]){
   cat("\t", yr_)
   ref.array.PFG[, , yr_] <- as.matrix(get(load(grep(paste0("_", yr_, "_"), ref.array.PFG.files, value = TRUE))))
-  test.array.PFG[, , yr_] <- as.matrix(get(load(grep(paste0("_", yr_, "_"), test.array.PFG.files, value = TRUE))))
+  test.array.PFG[, , yr_] <- as.matrix(get(load(grep(paste0("_", yr_, "$"), test.array.PFG.files, value = TRUE))))
 }
 
 ## transform abundances into presences absences
@@ -78,7 +109,7 @@ ref.array.PFG.bin <- ref.array.PFG > abund.thresh
 test.array.PFG.bin <- test.array.PFG > abund.thresh
 
 ## load the releve observation data
-source("/nfs_scratch2/dgeorges/PolygonFromExtent.R")
+source(file.path(path.to.dat, "Functions", "PolygonFromExtent.R"))
 mask.ref <- raster(ref.mask.path, crs = CRS(projETRS89))
 poly.simul <- PolygonFromExtent(extent(mask.ref), crs = CRS(projETRS89), asSpatial = TRUE) 
 
@@ -176,7 +207,7 @@ cat("\n> comparing ref and test simulations...")
 comp.test.ref <- data.frame(eval.occ.ref[, 1:2], eval.occ.test[, -c(1:2)] - eval.occ.ref[, -c(1:2)])
 
 cat("\n> summerizing differences btw simuls...")
-comp.test.ref.summ <- comp.test.ref %>% group_by(year) %>% summarize(nb.occ = mean(nb.occ, na.rm = TRUE),
+comp.test.ref.summ <- comp.test.ref %>% group_by(year) %>% dplyr::summarize(nb.occ = mean(nb.occ, na.rm = TRUE),
                                                                      nb.abs = mean(nb.abs, na.rm = TRUE),
                                                                      nb.pred.occ = mean(nb.pred.occ, na.rm = TRUE),
                                                                      nb.pred.abs = mean(nb.pred.abs, na.rm = TRUE),
@@ -206,11 +237,19 @@ gg.diff <- ggplot(data = comp.test.ref_, aes(x = year, y = metric.val, colour = 
   theme(legend.title=element_blank())
 
 ## save graph
-pdf(file.path(path.output.graph, paste0("comp_ref_test_PA_", simul_id, ".pdf")), width = 9)
+pdf(file.path(path.output, paste0("comp_ref_test_PA_", simul_id, ".pdf")), width = 9)
 print(gg.diff)
 dev.off()
 
 ## save tables
-write.table(eval.occ.test, file = file.path(path.output.tab, paste0("eval.occ.test.", simul_id, ".txt")), sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
-write.table(comp.test.ref, file = file.path(path.output.tab, paste0("comp.test.ref.", simul_id, ".txt")), sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
-write.table(comp.test.ref.summ, file = file.path(path.output.tab, paste0("comp.test.ref.summ.", simul_id, ".txt")), sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
+write.table(eval.occ.test, file = file.path(path.output, paste0("eval.occ.test.", simul_id, ".txt")), sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
+write.table(comp.test.ref, file = file.path(path.output, paste0("comp.test.ref.", simul_id, ".txt")), sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
+write.table(comp.test.ref.summ, file = file.path(path.output, paste0("comp.test.ref.summ.", simul_id, ".txt")), sep = "\t", col.names = TRUE, row.names = FALSE, quote = FALSE)
+
+## copy the table on the home because irods is dead!!!
+path.output.home <- "~/fhdmpt_simul_comparaisons/"
+dir.create(path.output.home, showWarnings = FALSE, recursive = TRUE)
+file.copy(path.output, path.output.home, recursive = TRUE, overwrite = TRUE)
+
+
+q("no")

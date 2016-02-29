@@ -108,20 +108,28 @@ print(grid.arrange(lp.nb.pfg, gg.nb.pfg,
                    lp.nb.pix, gg.nb.pix, ncol = 2))
 dev.off()
 
-##' The area 11 seems to be quite optimal to conduct oour tests
+##' The area 20/27/36 seems to be quite optimal to conduct our tests
 
-ext.pne.reduce <- ext.list[[43]]
-save(ext.pne.reduce, file = "ext.pne.reduce.RData")
+selected.area <- c(20,27,43)
+ras.files <- list.files("/nfs_scratch2/dgeorges/FATE_newHS/SIMUL_6STRATA/DATA", ".asc$", full.names = TRUE, recursive = TRUE)
+## remove useless files
+ras.files <- grep("_archiveMaya|_FORMAL_HS|_FORMAL_HS_BIN|_SCALED_HS_0.75|maskDemo.asc", ras.files, value = TRUE, invert = TRUE)
 
-##' create the new fate subarea
-setwd("/nfs_scratch2/dgeorges/FATE_newHS_devel/SIMUL_6STRATA/DATA/")
-ras.files <- list.files(".", ".asc$", full.names = TRUE, recursive = TRUE)
-
-for(ras.files_ in ras.files){
-  cat("\n", ras.files_)
-  r <- raster(ras.files_, crs = CRS(projETRS89))
-  r <- try(crop(r, ext.pne.reduce))
-  if(!inherits(r, 'try-error')){
-    writeRaster(r, filename = ras.files_, overwrite = TRUE)
+for(i in 1:length(selected.area)){
+  cat('\n\n> Zone', i)
+  ext.pne.reduce <- ext.list[[selected.area[i]]]
+  save(ext.pne.reduce, file = paste0("ext.pne.reduce.zone", i, ".RData"))
+  
+  ##' create the new fate subarea
+  for(ras.files_ in ras.files){
+    cat("\n", ras.files_)
+    r <- raster(ras.files_, crs = CRS(projETRS89))
+    r <- try(crop(r, ext.pne.reduce))
+    if(!inherits(r, 'try-error')){
+      fn_ <- file.path(dirname(sub("/SIMUL_6STRATA/", "/SIMUL_6STRATA_TEST/", ras.files_)),
+                       paste0("zone", i), basename(ras.files_))
+      dir.create(dirname(fn_), showWarnings = FALSE, recursive = TRUE)
+      writeRaster(r, filename = fn_, overwrite = TRUE)
+    }
   }
 }
