@@ -26,21 +26,250 @@
 
 rm(list = ls())
 
-output.dir <- "~/fhdmpt_simul_comparaisons_merged"
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+work.dir <- "~/Work/FATEHD/benchmarking/workdir/"
+input.dir <- "~/Work/FATEHD/benchmarking/results/"
+output.dir <- "~/Work/FATEHD/benchmarking/figures/"
+
+dir.create(work.dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(input.dir, showWarnings = FALSE, recursive = TRUE)
 dir.create(output.dir, showWarnings = FALSE, recursive = TRUE)
+
+setwd(work.dir)
 
 ##' execute the scp command to retrieave results from all cigri clusters
 
-## copy results from luke
-system("cp -r ~/fhdmpt_simul_comparaisons/* ~/fhdmpt_simul_comparaisons_merged/")
+## get input parameters file
+params <- read.table(file.path(input.dir, "params_formal_fhdmpt.txt"), header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+head(params)
 
-## copy results from other clusters
-clust.names <- c("froggy", "gofree", "ceciccluster", "fontaine")
-for(cn_ in clust.names){
-  cat("\n> getting", cn_, "results...")
-  system(paste0("scp -r ", cn_, ":fhdmpt_simul_comparaisons/* ~/fhdmpt_simul_comparaisons_merged/"))
+## check jobs that have been completed
+params$job.status <- file.exists(file.path(input.dir, "fhdmpt_simul_comparaisons", params$simul.id)) 
+sum(params$job.status)
+length(params$job.status)
+
+## create the summary table of jobs
+res.list <- lapply(params$simul.id[params$job.status], function(jid_){
+  res1_ <- read.table(file.path(input.dir, "fhdmpt_simul_comparaisons", jid_, paste0("comp.test.ref.summ.", jid_,".txt")), header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+  res2_ <- read.table(file.path(input.dir, "fhdmpt_simul_comparaisons", jid_, paste0("comp.test.ref.", jid_,".txt")), header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+  res_ <- bind_rows(res1_, res2_)
+  res_$simul.id <- jid_
+  return(res_)
+})
+
+res.df <- do.call(rbind, res.list)
+
+## merge with parameters
+res.df <- res.df %>% left_join(params)
+
+save(res.df, file = "res.df.RData")
+
+## create the eval table of jobs
+eval.list <- lapply(params$simul.id[params$job.status], function(jid_){
+  res_ <- read.table(file.path(input.dir, "fhdmpt_simul_comparaisons", jid_, paste0("eval.occ.test.", jid_,".txt")), header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+  res_$simul.id <- jid_
+  return(res_)
+})
+
+eval.df <- do.call(rbind, eval.list)
+
+## merge with parameters
+eval.df <- eval.df %>% left_join(params)
+
+save(eval.df, file = "eval.df.RData")
+
+##' # Explore campain results
+
+##' ## Find best models parameters combination
+
+eval.df_ <- eval.df %>% group_by(year, pfg) %>% summarise(best.job = simul.id[which.max(sens + spec)[1]], 
+                                                          sens = sens[which.max(sens + spec)[1]],
+                                                          spec = spec[which.max(sens + spec)[1]])
+
+##' ## importance of each parameters
+
+params.to.test <- c("envsuit.option", "seeding.params", "dispers.mode", "global.abund", "global.resource.thresh", "max.by.cohort", "area")
+param.to.test <- "envsuit.option"
+
+pdf(file.path(output.dir, paste0("eval_fhd_densplot.pdf")), width = 7 , height = 14)
+for(param.to.test in c(params.to.test)){
+  cat("\n>", param.to.test)
+  gg.dat <- res.df %>% filter(is.element(year, c("year840", "year850"))) %>% 
+    select_("pfg", "year", "sens", "spec", param.to.test) %>% 
+    mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>%
+    mutate_(.dots = setNames(param.to.test, "param.val")) %>%
+    gather(stat.name, stat.val, sens, spec, sens_spec)
+
+  gg <- ggplot(gg.dat, aes(x = stat.val, colour = factor(param.val))) + geom_density() + facet_grid(pfg_short~stat.name, scales = "free") + 
+    scale_color_discrete(name = param.to.test) + xlab("")
+  
+  print(gg)
+}
+dev.off()
+
+pdf(file.path(output.dir, paste0("eval_fhd_boxplot.pdf")), width = 7 , height = 14)
+for(param.to.test in c(params.to.test)){
+  cat("\n>", param.to.test)
+  gg.dat <- res.df %>% filter(is.element(year, c("year840", "year850"))) %>% 
+    select_("pfg", "year", "sens", "spec", param.to.test) %>% 
+    mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>%
+    mutate_(.dots = setNames(param.to.test, "param.val")) %>%
+    gather(stat.name, stat.val, sens, spec, sens_spec)
+
+  gg <- ggplot(gg.dat, aes(param.val, stat.val, fill = factor(param.val))) + geom_boxplot(varwidth = TRUE) + facet_grid(pfg_short~stat.name, scales = "free") + 
+    scale_fill_discrete(name = param.to.test) + xlab("")
+  
+  print(gg)
+}
+dev.off()
+
+##' detect the distribution of parameters that lead to the 5 percent best simulations
+
+##' criterria: max sens + spec
+gg.dat <- res.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% 
+  filter(pfg == "all") %>% 
+  select(pfg, year, sens, spec, one_of(params.to.test)) %>% 
+  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>%
+  filter(sens_spec >= quantile(sens_spec, 0.95)) %>%
+  gather(stat.name, stat.val, sens, spec, sens_spec) %>%
+  gather_("param.name", "param.value", params.to.test) %>%
+  distinct()
+
+
+pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_5pc_sens_spec.pdf")), width = 7 , height = 14)
+  gg <- ggplot(gg.dat %>% filter(stat.name == 'sens_spec'), aes(x = param.value, fill = factor(param.value))) + geom_bar() + facet_grid(param.name~stat.name) + 
+    scale_fill_discrete(name = "parameter value") + xlab("")
+  print(gg)
+dev.off()
+
+pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens_spec.pdf")), width = 7 , height = 14)
+  gg <- ggplot(gg.dat, aes(param.value, stat.val, fill = factor(param.value))) + geom_boxplot(varwidth = TRUE) + facet_grid(param.name~stat.name) + 
+    scale_fill_discrete(name = "parameter value") + xlab("")
+  print(gg)
+dev.off()
+
+##' criterria: max sens 
+gg.dat <- res.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% 
+  filter(pfg == "all") %>% 
+  select(pfg, year, sens, spec, one_of(params.to.test)) %>% 
+  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>%
+  filter(sens >= quantile(sens, 0.95)) %>%
+  gather(stat.name, stat.val, sens, spec, sens_spec) %>%
+  gather_("param.name", "param.value", params.to.test) %>%
+  distinct()
+
+
+pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+gg <- ggplot(gg.dat %>% filter(stat.name == 'sens'), aes(x = param.value, fill = factor(param.value))) + geom_bar() + facet_grid(param.name~stat.name) + 
+  scale_fill_discrete(name = "parameter value") + xlab("")
+print(gg)
+dev.off()
+
+pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+gg <- ggplot(gg.dat, aes(param.value, stat.val, fill = factor(param.value))) + geom_boxplot(varwidth = TRUE) + facet_grid(param.name~stat.name) + 
+  scale_fill_discrete(name = "parameter value") + xlab("")
+print(gg)
+dev.off()
+
+##' get the 20 best simulations by area
+gg.dat <- res.df %>% group_by(area) %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% 
+  filter(pfg == "all") %>% 
+  select(simul.id, pfg, year, sens, spec, one_of(params.to.test)) %>% 
+  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>%
+  filter(is.element(sens_spec,  tail(sort(sens_spec), 25))) 
+
+for(v_ in params.to.test){
+  cat("\n")
+  print(table(gg.dat %>% select_(v_)))
+  cat("\n")
 }
 
-## get input parameters file
-params <- read.table("~/params_fhdmpt.txt", header = FALSE, sep = " ", stringsAsFactors = FALSE)
-head(params)
+best.simul.id <- unique(gg.dat$simul.id)
+
+gg.dat <- res.df %>% filter(is.element(simul.id, best.simul.id)) %>%
+  select(simul.id, pfg, year, sens, spec, one_of(params.to.test)) %>% 
+  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>%
+  gather(stat.name, stat.val, sens, spec, sens_spec) 
+
+## which pfgs are upgraded in the best simulations
+pdf(file.path(output.dir, paste0("eval_fhd_pfg_imporve_top_20simulbyarea_sens_spec.pdf")), width = 7 , height = 21)
+  gg <- ggplot(gg.dat%>% ungroup, aes(stat.name, stat.val, fill = factor(stat.name))) + geom_boxplot(varwidth = TRUE) + facet_grid(pfg_short~.) + 
+    scale_fill_discrete(name = "stat") + xlab("")
+  print(gg)
+dev.off()
+
+##' According to this exploration I think that the best conbination of varaibles to use are:
+##' - "envsuit.option" = 2 (or 1)
+##' - "seeding.params" = 2
+##' - "dispers.mode" = 3
+##' - "global.abund" = 3
+##' - "global.resource.thresh" = 2
+##' - "max.by.cohort" = 1 (or 3)
+
+params %>% filter(area == 1, seeding.params == 2, dispers.mode == 3, global.abund == 3, global.resource.thresh == 2, max.by.cohort == 1)
+
+# envsuit.option seeding.params dispers.mode global.abund global.resource.thresh max.by.cohort area simul.id
+# 1              1              2            3            3                      2             1    1      163
+# 2              2              2            3            3                      2             1    1      164
+
+#######################################################################
+
+##' Integrate the pfg's cohexistance in performances calculations
+
+
+gg.dat <- eval.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% ## keep only year of interest
+  select(simul.id, pfg, year, nb.occ, nb.abs, nb.pred.occ, nb.pred.abs, sens, spec, one_of(params.to.test)) %>%  ## remove useless columns
+  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>% ## create the sens + spec stat
+  gather(stat.name, stat.value, sens, spec, sens_spec) %>% ## reshape statistiqueq
+  distinct() ## remove duplicated rows
+gg.dat$stat.val[is.na(gg.dat$stat.val) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
+
+gg.dat.all <- gg.dat %>% group_by(simul.id, stat.name, year) %>% 
+  summarize(pfg = "all", nb.pfg = sum(nb.pred.occ > 0, na.rm = TRUE),
+            stat.value = mean(stat.value, na.rm = TRUE)) %>% left_join(params) %>% ungroup
+
+gg.dat.all <- gg.dat.all %>% filter(stat.name == "sens_spec") %>% group_by(area, stat.name) %>%
+  filter( stat.value >= quantile(stat.value, 0.90), nb.pfg >= quantile(nb.pfg, 0.90)) %>%
+  gather_("param.name", "param.value", params.to.test) %>%
+  distinct()
+
+summary(gg.dat.all)
+sort(table(gg.dat.all$simul.id))
+
+# pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_10pc_nbpfg_sens_spec_sensspec.pdf")), width = 7 , height = 14)
+gg <- ggplot(gg.dat.all, aes(x = param.value, fill = factor(param.value))) + geom_bar() + facet_grid(param.name~stat.name) + 
+  scale_fill_discrete(name = "parameter value") + xlab("")
+print(gg)
+# dev.off()
+
+# pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+gg <- ggplot(gg.dat.all, aes(param.value, stat.value, fill = factor(param.value))) + geom_boxplot(varwidth = TRUE) + facet_grid(param.name~stat.name) + 
+  scale_fill_discrete(name = "parameter value") + xlab("")
+print(gg)
+# dev.off()
+
+##' identificate the parameters list that lead to the pest simuls
+
+##' According to this exploration I think that the best conbination of varaibles to use are:
+##' - "envsuit.option" = 1
+##' - "seeding.params" = 2/3
+##' - "dispers.mode" = 1
+##' - "global.abund" = 1/3
+##' - "global.resource.thresh" = 2
+##' - "max.by.cohort" = 2/3
+
+params %>% filter(area == 1, envsuit.option == 1, is.element(seeding.params, c(2,3)), dispers.mode == 1, 
+                  is.element(global.abund, c(1, 3)), global.resource.thresh == 2, is.element(max.by.cohort, c(2,3)))
+
+# envsuit.option seeding.params dispers.mode global.abund global.resource.thresh max.by.cohort area simul.id
+# 1              1              2            1            1                      2             2    1      483
+# 2              1              3            1            1                      2             2    1      485
+# 3              1              2            1            3                      2             2    1      531
+# 4              1              3            1            3                      2             2    1      533
+# 5              1              2            1            1                      2             3    1      867
+# 6              1              3            1            1                      2             3    1      869
+# 7              1              2            1            3                      2             3    1      915
+# 8              1              3            1            3                      2             3    1      917
