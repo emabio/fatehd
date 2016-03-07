@@ -221,7 +221,7 @@ params %>% filter(area == 1, seeding.params == 2, dispers.mode == 3, global.abun
 
 
 gg.dat <- eval.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% ## keep only year of interest
-  select(simul.id, pfg, year, nb.occ, nb.abs, nb.pred.occ, nb.pred.abs, sens, spec, one_of(params.to.test)) %>%  ## remove useless columns
+  dplyr::select(simul.id, pfg, year, nb.occ, nb.abs, nb.pred.occ, nb.pred.abs, sens, spec, one_of(params.to.test)) %>%  ## remove useless columns
   mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) %>% ## create the sens + spec stat
   gather(stat.name, stat.value, sens, spec, sens_spec) %>% ## reshape statistiqueq
   distinct() ## remove duplicated rows
@@ -260,6 +260,7 @@ print(gg)
 ##' - "global.abund" = 1/3
 ##' - "global.resource.thresh" = 2
 ##' - "max.by.cohort" = 2/3
+##' 
 
 params %>% filter(area == 1, envsuit.option == 1, is.element(seeding.params, c(2,3)), dispers.mode == 1, 
                   is.element(global.abund, c(1, 3)), global.resource.thresh == 2, is.element(max.by.cohort, c(2,3)))
@@ -273,3 +274,44 @@ params %>% filter(area == 1, envsuit.option == 1, is.element(seeding.params, c(2
 # 6              1              3            1            1                      2             3    1      869
 # 7              1              2            1            3                      2             3    1      915
 # 8              1              3            1            3                      2             3    1      917
+
+
+##' As an extra test we can buid a linear model to check the influence of parameters on our stetistics
+
+gg.dat <- eval.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% ## keep only year of interest
+  dplyr::select(simul.id, pfg, year, nb.occ, nb.abs, nb.pred.occ, nb.pred.abs, sens, spec, one_of(params.to.test)) %>%  ## remove useless columns
+  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) 
+
+gg.dat$sens[is.na(gg.dat$sens) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
+gg.dat$spec[is.na(gg.dat$spec) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
+gg.dat$sens_spec[is.na(gg.dat$sens_spec) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
+
+
+
+
+
+gg.dat.all <- gg.dat %>% group_by(simul.id, year) %>% 
+  summarize(pfg = "all", nb.pfg = sum(nb.pred.occ > 0, na.rm = TRUE),
+            sens = mean(sens, na.rm = TRUE),
+            spec = mean(spec, na.rm = TRUE),
+            sens_spec = mean(sens_spec, na.rm = TRUE)) %>% left_join(params) %>% ungroup %>% data.frame
+for(ptt_ in params.to.test){
+  gg.dat.all[, ptt_] <- factor(gg.dat.all[, ptt_])
+}
+
+head(gg.dat.all)
+
+library(lme4)
+
+lm.spec <- lmer(spec ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort + (1|year) + (1|area), data = gg.dat.all)
+summary(lm.spec)
+
+lm.sens <- lmer(sens ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort + (1|year) + (1|area), data = gg.dat.all)
+summary(lm.sens)
+
+lm.sens_spec <- lmer(sens ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort + (1|year) + (1|area), data = gg.dat.all)
+summary(lm.sens_spec)
+
+
+lm.nb.pfg <- lm(nb.pfg ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + area, data = gg.dat.all)
+summary(lm.nb.pfg)
