@@ -24,6 +24,13 @@
 ##' luke in the directory "~/fhdmpt_simul_comparaisons_merged/"
 ##' 
 
+#+ knitr option, echo = FALSE 
+library(knitr)
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=TRUE, warning=FALSE, message=FALSE,
+                      cache  = TRUE)
+
+#+ start script, 
 rm(list = ls())
 
 library(dplyr)
@@ -94,7 +101,9 @@ eval.df_ <- eval.df %>% group_by(year, pfg) %>% summarise(best.job = simul.id[wh
 params.to.test <- c("envsuit.option", "seeding.params", "dispers.mode", "global.abund", "global.resource.thresh", "max.by.cohort", "area")
 param.to.test <- "envsuit.option"
 
-pdf(file.path(output.dir, paste0("eval_fhd_densplot.pdf")), width = 7 , height = 14)
+# pdf(file.path(output.dir, paste0("eval_fhd_densplot.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_densplot, dev = c('png'), fig.width = 7, fig.height = 14
 for(param.to.test in c(params.to.test)){
   cat("\n>", param.to.test)
   gg.dat <- res.df %>% filter(is.element(year, c("year840", "year850"))) %>% 
@@ -108,9 +117,11 @@ for(param.to.test in c(params.to.test)){
   
   print(gg)
 }
-dev.off()
+# dev.off()
 
-pdf(file.path(output.dir, paste0("eval_fhd_boxplot.pdf")), width = 7 , height = 14)
+# pdf(file.path(output.dir, paste0("eval_fhd_boxplot.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_boxplot, dev = c('png'), fig.width = 7, fig.height = 14
 for(param.to.test in c(params.to.test)){
   cat("\n>", param.to.test)
   gg.dat <- res.df %>% filter(is.element(year, c("year840", "year850"))) %>% 
@@ -124,7 +135,7 @@ for(param.to.test in c(params.to.test)){
   
   print(gg)
 }
-dev.off()
+# dev.off()
 
 ##' detect the distribution of parameters that lead to the 5 percent best simulations
 
@@ -139,17 +150,21 @@ gg.dat <- res.df %>% filter(is.element(year, c("year830", "year840", "year850"))
   distinct()
 
 
-pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_5pc_sens_spec.pdf")), width = 7 , height = 14)
+# pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_5pc_sens_spec.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_barplot_top_5pc_sens_spec, dev = c('png'), fig.width = 7, fig.height = 14
   gg <- ggplot(gg.dat %>% filter(stat.name == 'sens_spec'), aes(x = param.value, fill = factor(param.value))) + geom_bar() + facet_grid(param.name~stat.name) + 
     scale_fill_discrete(name = "parameter value") + xlab("")
   print(gg)
-dev.off()
+# dev.off()
 
-pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens_spec.pdf")), width = 7 , height = 14)
+# pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens_spec.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_boxplot_top_5pc_sens_spec, dev = c('png'), fig.width = 7, fig.height = 21
   gg <- ggplot(gg.dat, aes(param.value, stat.val, fill = factor(param.value))) + geom_boxplot(varwidth = TRUE) + facet_grid(param.name~stat.name) + 
     scale_fill_discrete(name = "parameter value") + xlab("")
   print(gg)
-dev.off()
+# dev.off()
 
 ##' criterria: max sens 
 gg.dat <- res.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% 
@@ -162,17 +177,21 @@ gg.dat <- res.df %>% filter(is.element(year, c("year830", "year840", "year850"))
   distinct()
 
 
-pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+# pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_barplot_top_5pc_sens, dev = c('png'), fig.width = 7, fig.height = 14
 gg <- ggplot(gg.dat %>% filter(stat.name == 'sens'), aes(x = param.value, fill = factor(param.value))) + geom_bar() + facet_grid(param.name~stat.name) + 
   scale_fill_discrete(name = "parameter value") + xlab("")
 print(gg)
-dev.off()
+# dev.off()
 
-pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+# pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_max_coocc_sens.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_boxplot_top_5pc_max_coocc_sens, dev = c('png'), fig.width = 7, fig.height = 14
 gg <- ggplot(gg.dat, aes(param.value, stat.val, fill = factor(param.value))) + geom_boxplot(varwidth = TRUE) + facet_grid(param.name~stat.name) + 
   scale_fill_discrete(name = "parameter value") + xlab("")
 print(gg)
-dev.off()
+# dev.off()
 
 ##' get the 20 best simulations by area
 gg.dat <- res.df %>% group_by(area) %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% 
@@ -195,11 +214,13 @@ gg.dat <- res.df %>% filter(is.element(simul.id, best.simul.id)) %>%
   gather(stat.name, stat.val, sens, spec, sens_spec) 
 
 ## which pfgs are upgraded in the best simulations
-pdf(file.path(output.dir, paste0("eval_fhd_pfg_imporve_top_20simulbyarea_sens_spec.pdf")), width = 7 , height = 21)
+# pdf(file.path(output.dir, paste0("eval_fhd_pfg_imporve_top_20simulbyarea_sens_spec.pdf")), width = 7 , height = 21)
+
+#+ eval_fhd_pfg_imporve_top_20simulbyarea_sens_spec, dev = c('png'), fig.width = 7, fig.height = 21
   gg <- ggplot(gg.dat%>% ungroup, aes(stat.name, stat.val, fill = factor(stat.name))) + geom_boxplot(varwidth = TRUE) + facet_grid(pfg_short~.) + 
     scale_fill_discrete(name = "stat") + xlab("")
   print(gg)
-dev.off()
+# dev.off()
 
 ##' According to this exploration I think that the best conbination of varaibles to use are:
 ##' - "envsuit.option" = 2 (or 1)
@@ -240,12 +261,16 @@ summary(gg.dat.all)
 sort(table(gg.dat.all$simul.id))
 
 # pdf(file.path(output.dir, paste0("eval_fhd_barplot_top_10pc_nbpfg_sens_spec_sensspec.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_barplot_top_10pc_nbpfg_sens_spec_sensspec, dev = c('png'), fig.width = 7, fig.height = 14
 gg <- ggplot(gg.dat.all, aes(x = param.value, fill = factor(param.value))) + geom_bar() + facet_grid(param.name~stat.name) + 
   scale_fill_discrete(name = "parameter value") + xlab("")
 print(gg)
 # dev.off()
 
 # pdf(file.path(output.dir, paste0("eval_fhd_boxplot_top_5pc_sens.pdf")), width = 7 , height = 14)
+
+#+ eval_fhd_boxplot_top_5pc_sens, dev = c('png'), fig.width = 7, fig.height = 14
 gg <- ggplot(gg.dat.all, aes(param.value, stat.value, fill = factor(param.value))) + geom_boxplot(varwidth = TRUE) + facet_grid(param.name~stat.name) + 
   scale_fill_discrete(name = "parameter value") + xlab("")
 print(gg)
@@ -280,11 +305,11 @@ params %>% filter(area == 1, envsuit.option == 1, is.element(seeding.params, c(2
 
 gg.dat <- eval.df %>% filter(is.element(year, c("year830", "year840", "year850"))) %>% ## keep only year of interest
   dplyr::select(simul.id, pfg, year, nb.occ, nb.abs, nb.pred.occ, nb.pred.abs, sens, spec, one_of(params.to.test)) %>%  ## remove useless columns
-  mutate(sens_spec = sens + spec, pfg_short = sub("_.*$", "", pfg)) 
+  mutate(tss = sens + spec - 1, pfg_short = sub("_.*$", "", pfg)) 
 
 gg.dat$sens[is.na(gg.dat$sens) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
 gg.dat$spec[is.na(gg.dat$spec) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
-gg.dat$sens_spec[is.na(gg.dat$sens_spec) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
+gg.dat$sens_spec[is.na(gg.dat$tss) & gg.dat$nb.occ > 0 & gg.dat$nb.abs > 0] <- 0 ## set to 0 the stats that are not calculated because of species disparition
 
 
 
@@ -294,7 +319,7 @@ gg.dat.all <- gg.dat %>% group_by(simul.id, year) %>%
   summarize(pfg = "all", nb.pfg = sum(nb.pred.occ > 0, na.rm = TRUE),
             sens = mean(sens, na.rm = TRUE),
             spec = mean(spec, na.rm = TRUE),
-            sens_spec = mean(sens_spec, na.rm = TRUE)) %>% left_join(params) %>% ungroup %>% data.frame
+            tss = mean(tss, na.rm = TRUE)) %>% left_join(params) %>% ungroup %>% data.frame
 for(ptt_ in params.to.test){
   gg.dat.all[, ptt_] <- factor(gg.dat.all[, ptt_])
 }
@@ -309,9 +334,43 @@ summary(lm.spec)
 lm.sens <- lmer(sens ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort + (1|year) + (1|area), data = gg.dat.all)
 summary(lm.sens)
 
-lm.sens_spec <- lmer(sens ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort + (1|year) + (1|area), data = gg.dat.all)
-summary(lm.sens_spec)
+lm.tss <- lmer(tss ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort + (1|year) + (1|area), data = gg.dat.all)
+summary(lm.tss)
 
 
-lm.nb.pfg <- lm(nb.pfg ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + area, data = gg.dat.all)
+lm.nb.pfg <- lmer(nb.pfg ~ envsuit.option + seeding.params + dispers.mode + global.abund + global.resource.thresh + max.by.cohort  + (1|year) + (1|area), data = gg.dat.all)
 summary(lm.nb.pfg)
+
+nb.rand <- 5
+fixed.var <- c("envsuit.option", "seeding.params", "dispers.mode", "global.abund", "global.resource.thresh", "max.by.cohort")
+mod.names <- c("lm.sens", "lm.spec", "lm.tss", "lm.nb.pfg")
+names(mod.names) <- c("sensitivity", "specificity", "TSS", "pfg co-exitance")
+
+gg.dat <- NULL
+
+for(mod.id_ in 1:length(mod.names)){
+  cat("\n> mod:", mod.id_)
+  vi.tab <- matrix(NA, nb.rand, length(fixed.var), dimnames = list(paste0("rand_", 1:nb.rand), fixed.var))
+  for(fixed.var_ in fixed.var){
+    pred.ref_ <- predict(get(mod.names[mod.id_]), type = 'response', re.form=NA)
+    for(nb.rand_ in 1:nb.rand){
+      dat_ <- gg.dat.all %>% select_(.dots = fixed.var) %>% 
+        mutate_(.dots=setNames(list(lazyeval::interp(~ sample(varname), varname = as.name(fixed.var_))), fixed.var_))
+      pred_ <- predict(get(mod.names[mod.id_]), type = 'response', dat_, re.form=NA)
+      vi_ <- 1 - abs(cor(pred.ref_, pred_, method = "spearman"))
+      vi.tab[nb.rand_, fixed.var_] <- vi_
+    }
+  }
+  
+  vi.mean <- colMeans(vi.tab)
+  gg.dat <- bind_rows(gg.dat, data.frame(vi = vi.mean, var = factor(names(vi.mean)), group = "models.params", stat = names(mod.names)[mod.id_], stringsAsFactors = FALSE))
+}
+
+#+ varimport_radar, dev = c('png'), fig.width = 14, fig.height = 11
+gg <- ggplot(gg.dat, aes(x = factor(var), y = vi, group = group)) +
+  geom_point() + coord_cartesian(ylim = c(0,1)) +
+  facet_wrap(~ stat) +
+  # geom_line() + 
+  coord_polar() + labs(title = paste0("variable importance"), x = "", y ="") 
+
+print(gg)
