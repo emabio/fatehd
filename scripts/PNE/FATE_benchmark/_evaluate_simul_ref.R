@@ -23,7 +23,7 @@ cat("\n- path.to.dat <-", path.to.dat)
 cat("\n- file_name <-", file_name)
 cat("\n- nbCores <-", nbCores)
 cat("\n- maps <-", maps)
-cat("\n- lib.dir <-", lib.dir)
+# cat("\n- lib.dir <-", lib.dir)
 cat("\n-------------------------")
 
 ## Retrieve name of the simul replication --------------------------------------
@@ -63,7 +63,8 @@ test.times <- sort(as.numeric(sub("_.*$", "", sub("^.*_year", "", test.array.PFG
 inter.times <- test.times
 
 ## test that objects dimentions are compatible
-test.array.test <- get(load(test.array.PFG.files[1]))
+test.array.test <- get(load(test.array.PFG.files[15]))
+summary(test.array.test)
 pfg.list <- colnames(test.array.test)
 
 
@@ -78,6 +79,7 @@ for(yr_ in dimnames(test.array.PFG)[[3]]){
 
 ## transform abundances into presences absences
 test.array.PFG.bin <- test.array.PFG > abund.thresh
+# summary(test.array.PFG.bin)
 
 ## load the releve observation data
 source(file.path(path.to.dat, "Functions", "PolygonFromExtent.R"))
@@ -117,10 +119,10 @@ habitats.vect <- raster::extract(habitats, xyFromCell(mask.ref, 1:ncell(mask.ref
 # yr_ <- "year100"
 # pfg_ <- pfg.list[1]
 ## end test
-
+library(parallel)
 cat("\n> evaluating test simulation...")
 eval.occ.test <- do.call(rbind, lapply(pfg.list, function(pfg_){
-  do.call(rbind, lapply(dimnames(test.array.PFG)[[3]], function(yr_){
+  do.call(rbind, mclapply(dimnames(test.array.PFG)[[3]], function(yr_){
     ## deal with the full area
     dat_ <- data.frame(id = 1:nrow(occ.array), 
                        obs = occ.array[, pfg_], 
@@ -178,7 +180,7 @@ eval.occ.test <- do.call(rbind, lapply(pfg.list, function(pfg_){
       }
     }
     return(df.out)
-  }))
+  }, mc.cores = 16))
 }))
 
 ## deal with abundances metrics
@@ -190,7 +192,7 @@ PFGxPlots <- get(load(file.path(path.input.data, "Objects", "ABUND_DATA", "PFGxP
 plots <- plots[rownames(PFGxPlots),]
 
 ## create the relative PFG abund relative to other PFG
-PFGxPlots.rel <- PFGxPlots %>% select(-Others) 
+PFGxPlots.rel <- PFGxPlots %>% dplyr::select(-Others) 
 PFGxPlots.rowsums <- rowSums(PFGxPlots.rel)
 PFGxPlots.rel <- PFGxPlots.rel / PFGxPlots.rowsums
 
@@ -277,12 +279,12 @@ eval.abund.test <- do.call(rbind, lapply(pfg.list, function(pfg_){
       }
     }
     return(df.out)
-  }, mc.cores = 16) )
+  }, mc.cores = 12) )
 }))
 
 
-eval.abund.test.bis <- do.call(rbind, lapply(pfg.list, function(pfg_){
-  do.call(rbind, lapply(dimnames(test.array.PFG)[[3]], function(yr_){
+eval.abund.test.bis <- do.call(rbind, mclapply(pfg.list, function(pfg_){
+  do.call(rbind, mclapply(dimnames(test.array.PFG)[[3]], function(yr_){
     pfg.short_ <- sub("_.*$", "", pfg_)
     ## deal with the full area
     dat_ <- na.omit(data.frame(id = rownames(PFGxPlots), 
@@ -345,7 +347,7 @@ eval.abund.test.bis <- do.call(rbind, lapply(pfg.list, function(pfg_){
       }
     }
     return(df.out)
-  }))
+  }, mc.cores = 16))
 }))
 
 eval.abund.test.ter <- full_join(eval.abund.test, eval.abund.test.bis)
